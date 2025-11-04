@@ -13,6 +13,7 @@ __pycache__/
 
 # 环境变量文件（存放密钥、数据库密码等）
 .env
+app/database_local.py
 
 # 日志与数据库文件
 *.log
