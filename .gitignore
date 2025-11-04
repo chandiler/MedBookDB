@@ -1,0 +1,37 @@
+# -------------------------
+# Python / FastAPI 通用忽略规则
+# -------------------------
+
+# 虚拟环境
+venv/
+env/
+
+# Python 缓存与编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 环境变量文件（存放密钥、数据库密码等）
+.env
+
+# 日志与数据库文件
+*.log
+*.sqlite3
+
+# 编辑器配置
+.vscode/
+.idea/
+
+# macOS 系统文件
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows 系统文件
+Thumbs.db
+desktop.ini
+
+# 构建与打包文件
+dist/
+build/
+*.egg-info/
