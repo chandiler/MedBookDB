@@ -14,11 +14,8 @@ from alembic import context
 from app.core.config import settings
 from app.db.base import Base
 
-# IMPORTA AQUÍ TODOS LOS MODELOS para que aparezcan en autogenerate:
-# (cuando crees User, Appointment, etc., impórtalos aquí)
-# from app.modules.users.models import User
-# from app.modules.appointments.models import Appointment
-# ...
+# Models
+from app.modules.users.models import User 
 
 # Alembic Config object
 config = context.config
