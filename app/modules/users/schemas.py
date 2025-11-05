@@ -66,3 +66,30 @@ class ErrorResponse(BaseModel):
     error: str
     message: str
     status: int
+
+
+# --- Login / Me / Refresh ---
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: SecretStr
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class TokenPair(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    refresh_token: str | None = None  # include only if you enable refresh flow
+
+
+LoginResponse = TokenPair
+MeResponse = UserPublic
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str

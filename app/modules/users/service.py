@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.users import repository as users_repo
 from app.modules.users.models import User
-from app.modules.users.schemas import RegisterRequest, UserPublic, Role
-from app.core.security import hash_password
-
+from app.modules.users.schemas import RegisterRequest, UserPublic, Role, LoginRequest, LoginResponse
+from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
+from app.core.config import settings
 
 # Service-level errors (map them to HTTP in the router)
 class EmailAlreadyExists(Exception):
@@ -19,6 +19,8 @@ class EmailAlreadyExists(Exception):
 class WeakPassword(Exception):
     pass
 
+class InvalidCredentials(Exception):
+    pass
 
 def _to_public(user: User) -> UserPublic:
     """
@@ -78,3 +80,32 @@ async def register_user(session: AsyncSession, payload: RegisterRequest) -> User
 
     # 4) Map to public DTO
     return _to_public(user)
+
+async def login_user(session: AsyncSession, payload: LoginRequest) -> LoginResponse:
+    """
+    1) Fetch user by email
+    2) Verify bcrypt password
+    3) Issue access (and optionally refresh) tokens
+    """
+    user = await users_repo.get_by_email(session, payload.email)
+    if not user:
+        raise InvalidCredentials("invalid_credentials")
+
+    if not verify_password(payload.password.get_secret_value(), user.password_hash):
+        raise InvalidCredentials("invalid_credentials")
+
+    # Optional: check is_active / email_verified here if you want stricter behavior
+    access = create_access_token(
+        subject=str(user.id),
+        email=user.email,
+        role=user.role,
+        scopes=["profile:read", "appointments:read"],  # adjust as needed
+    )
+    # If you want refresh tokens, uncomment below and include in response.
+    # refresh = create_refresh_token(subject=str(user.id))
+
+    return LoginResponse(
+        access_token=access,
+        expires_in=settings.ACCESS_EXPIRES_MIN * 60,
+        refresh_token=None,  # or refresh
+    )
