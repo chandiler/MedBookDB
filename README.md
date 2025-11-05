@@ -84,3 +84,16 @@ Uvicorn running on http://127.0.0.1:8000
 
 
 and be able to access the Swagger API docs at /docs.
+```
+
+# Database Migrations (Alembic)
+
+
+```bash
+# If there is no baseline yet
+alembic revision -m "baseline"
+
+# Apply all migrations (creates tables, e.g., users)
+alembic upgrade head
+
+```
