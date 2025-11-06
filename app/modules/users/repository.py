@@ -4,13 +4,11 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, func, or_, asc, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.users.models import User, UserRole
-
-
 class EmailAlreadyExistsError(Exception):
     """Raised when trying to insert a user with an email that already exists."""
 
@@ -108,3 +106,68 @@ async def update_lastname(
     await session.flush()
     await session.refresh(user)
     return user
+
+async def list_patients_repo(
+    session: AsyncSession,
+    *,
+    q: Optional[str],
+    is_active: Optional[bool],
+    email_verified: Optional[bool],
+    order_by: str,
+    order_dir: str,
+    limit: int,
+    offset: int,
+) -> tuple[list[User], int]:
+    # Base WHERE: only patients
+    conditions = [User.role == "patient"]
+
+    # Flags
+    if is_active is not None:
+        conditions.append(User.is_active == is_active)
+    if email_verified is not None:
+        conditions.append(User.email_verified == email_verified)
+
+    # Search (ILIKE on email/first/last names)
+    if q:
+        term = f"%{q.strip().lower()}%"
+        conditions.append(
+            or_(
+                func.lower(User.email).ilike(term),
+                func.lower(User.first_name).ilike(term),
+                func.lower(User.last_name).ilike(term),
+            )
+        )
+
+    # Order
+    col_map = {
+        "created_at": User.created_at,
+        "last_name": User.last_name,
+        "email": User.email,
+    }
+    col = col_map.get(order_by, User.created_at)
+    ordering = asc(col) if order_dir == "asc" else desc(col)
+
+    # Total count
+    total_stmt = select(func.count()).select_from(User).where(*conditions)
+    total = (await session.execute(total_stmt)).scalar_one()
+
+    # Page
+    stmt = (
+        select(User)
+        .where(*conditions)
+        .order_by(ordering, User.id)  # tie-breaker for stable paging
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    return rows, total
+
+async def get_patient_by_id_repo(
+    session: AsyncSession, *, patient_id: UUID
+) -> Optional[User]:
+    """
+    Return a patient by UUID or None if not found (enforces role='patient').
+    """
+    stmt = select(User).where(User.id == patient_id, User.role == "patient")
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()

@@ -4,12 +4,15 @@ from __future__ import annotations
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from uuid import UUID
 from app.modules.users import repository as users_repo
 from app.modules.users.models import User
-from app.modules.users.schemas import RegisterRequest, UserPublic, Role, LoginRequest, LoginResponse
+from app.modules.users.schemas import RegisterRequest, UserPublic, Role, LoginRequest, LoginResponse,    PatientListParams,PatientListItem,PatientPage
+
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.config import settings
+
+from app.modules.users.repository import get_patient_by_id_repo, list_patients_repo
 
 # Service-level errors (map them to HTTP in the router)
 class EmailAlreadyExists(Exception):
@@ -110,3 +113,46 @@ async def login_user(session: AsyncSession, payload: LoginRequest) -> LoginRespo
         expires_in=settings.ACCESS_EXPIRES_MIN * 60,
         refresh_token=None,  # or refresh
     )
+
+
+def _to_patient_item(u: User) -> PatientListItem:
+    return PatientListItem.model_validate(u)
+
+async def list_patients(
+    session: AsyncSession,
+    params: PatientListParams,
+) -> PatientPage:
+    """List patients with search, flags, ordering, and pagination."""
+    users, total = await list_patients_repo(
+        session,
+        q=params.q,
+        is_active=params.is_active,
+        email_verified=params.email_verified,
+        order_by=params.order_by,
+        order_dir=params.order_dir,
+        limit=params.limit,
+        offset=params.offset,
+    )
+    items = [_to_patient_item(u) for u in users]
+    has_next = params.offset + params.limit < total
+    return PatientPage(
+        items=items,
+        total=total,
+        limit=params.limit,
+        offset=params.offset,
+        has_next=has_next,
+    )
+
+class PatientNotFound(Exception):
+    pass
+
+def _to_patient_item(u: User) -> PatientListItem:
+    return PatientListItem.model_validate(u)
+
+async def get_patient_by_id(
+    session: AsyncSession, patient_id: UUID
+) -> PatientListItem:
+    user = await get_patient_by_id_repo(session, patient_id=patient_id)
+    if not user:
+        raise PatientNotFound("patient_not_found")
+    return _to_patient_item(user)

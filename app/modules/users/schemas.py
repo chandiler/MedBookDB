@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 from typing import Annotated
@@ -94,3 +94,42 @@ MeResponse = UserPublic
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+# List Schemas
+class PatientListParams(BaseModel):
+    q: Optional[str] = Field(
+        default=None,
+        description="Case-insensitive search over email, first_name, last_name"
+    )
+    is_active: Optional[bool] = None
+    email_verified: Optional[bool] = None
+
+    # Pagination
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+    # Ordering
+    order_by: str = Field(default="created_at", pattern="^(created_at|last_name|email)$")
+    order_dir: str = Field(default="desc", pattern="^(asc|desc)$")
+
+
+class PatientListItem(BaseModel):
+    id: UUID
+    email: EmailStr
+    first_name: str
+    last_name: str
+    phone: Optional[str] = None
+    is_active: bool
+    email_verified: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PatientPage(BaseModel):
+    items: List[PatientListItem]
+    total: int
+    limit: int
+    offset: int
+    has_next: bool
