@@ -15,7 +15,7 @@ def demo_success():
             INSERT INTO users (username, password_hash, role, email)
             VALUES (%s, %s, %s, %s)
             """,
-            ("user_success1", "hash123", "patient", "user1@example.com"),
+            ("user_success44444", "h5555", "patient", "user1@example.com"),
         )
 
         # 插入第二个用户
@@ -24,7 +24,7 @@ def demo_success():
             INSERT INTO users (username, password_hash, role, email)
             VALUES (%s, %s, %s, %s)
             """,
-            ("user_success2", "hash456", "doctor", "user2@example.com"),
+            ("user_success5555555", "hash456", "doctor", "user2@example.com"),
         )
 
     # 执行到这里表示事务提交成功
