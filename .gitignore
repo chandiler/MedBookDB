@@ -6,6 +6,9 @@
 venv/
 env/
 
+# demo测试文件
+test_demo/
+
 # Python 缓存与编译文件
 __pycache__/
 *.py[cod]
