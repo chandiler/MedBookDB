@@ -14,6 +14,7 @@ DB_HOST=localhost
 DB_PORT=5432
 BACKUP_DIR=./backups
 KEEP_DAYS=14
+X-Admin-Token=supersecret-please-change
 ```
 
 ## Usage
