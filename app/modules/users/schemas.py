@@ -25,6 +25,7 @@ class RegisterRequest(BaseModel):
     password: SecretStr = Field(..., description="8–64 chars, at least one letter and one digit")
     first_name: NameStr
     last_name: NameStr
+    role: Role = Role.patient
     phone: Optional[PhoneStr] = None
 
     @field_validator("email", mode="before")

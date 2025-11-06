@@ -75,6 +75,7 @@ async def register_user(session: AsyncSession, payload: RegisterRequest) -> User
         first_name=payload.first_name,
         last_name=payload.last_name,
         phone=payload.phone,
+         role=payload.role.value,
         # role left as default (patient) inside repository/model
     )
 
