@@ -133,3 +133,9 @@ class PatientPage(BaseModel):
     limit: int
     offset: int
     has_next: bool
+
+#Update Schemas
+class PatientUpdateRequest(BaseModel):
+    first_name: NameStr
+    last_name: NameStr
+    phone: Optional[PhoneStr] = None

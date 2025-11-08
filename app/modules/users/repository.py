@@ -171,3 +171,28 @@ async def get_patient_by_id_repo(
     stmt = select(User).where(User.id == patient_id, User.role == "patient")
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+async def update_patient_repo(
+    session: AsyncSession,
+    *,
+    patient_id: UUID,
+    first_name: str,
+    last_name: str,
+    phone: Optional[str],
+) -> Optional[User]:
+    """
+    Update a patient (role='patient') by id. Returns updated user or None if not found.
+    """
+    stmt = select(User).where(User.id == patient_id, User.role == "patient")
+    result = await session.execute(stmt)
+    user: Optional[User] = result.scalar_one_or_none()
+    if not user:
+        return None
+
+    user.first_name = first_name.strip()
+    user.last_name = last_name.strip()
+    user.phone = phone.strip() if isinstance(phone, str) else None
+
+    await session.flush()
+    await session.refresh(user)
+    return user

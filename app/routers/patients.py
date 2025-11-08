@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.sql import get_session
 from app.dependencies import get_current_user  
-from app.modules.users.schemas import PatientListItem, PatientListParams, PatientPage
+from app.modules.users.schemas import PatientListItem, PatientListParams, PatientPage, PatientUpdateRequest
 from app.modules.users.service import list_patients
 from app.modules.users.models import User  
 
@@ -15,7 +15,7 @@ from fastapi import HTTPException, status
 
 from app.modules.users.service import get_patient_by_id as get_patient_by_id_svc, PatientNotFound
 from app.modules.users.schemas import PatientListItem
-
+from app.modules.users.service import update_patient as update_patient_svc, PatientNotFound
 router = APIRouter(tags=["patients"])
 
 @router.get(
@@ -58,5 +58,21 @@ async def patients_show(
 ):
     try:
         return await get_patient_by_id_svc(session, patient_id)
+    except PatientNotFound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="patient_not_found")
+
+@router.put(
+    "/patients/{patient_id}",
+    response_model=PatientListItem,
+    summary="Update a patient by id (Bearer required, no role checks)",
+)
+async def patients_update(
+    patient_id: UUID,
+    payload: PatientUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),  # Bearer only
+):
+    try:
+        return await update_patient_svc(session, patient_id, payload)
     except PatientNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="patient_not_found")
