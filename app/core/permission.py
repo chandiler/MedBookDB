@@ -2,8 +2,7 @@ from fastapi import Depends, HTTPException, Path, status
 from sqlalchemy.orm import Session
 from typing import Callable
 from app.core.security import get_current_user, TokenData
-from app.db.session import get_session  # 你的 session 工厂
-
+from app.db.sql import get_session
 def require_roles(*allowed: str):
     def dep(user: TokenData = Depends(get_current_user)):
         if user.role not in allowed:

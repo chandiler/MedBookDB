@@ -39,3 +39,5 @@ desktop.ini
 dist/
 build/
 *.egg-info/
+
+.env

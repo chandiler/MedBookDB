@@ -55,3 +55,20 @@ async def ping_db() -> bool:
     async with AsyncSessionLocal() as session:
         await session.execute(text("SELECT 1"))
         return True
+
+async def init_db():
+    """
+    Initialize database tables
+    """
+    from sqlalchemy.ext.declarative import declarative_base
+    Base = declarative_base()
+    
+    # Importar todos los modelos aquí para que se registren
+    try:
+        from app import models  # Esto importa todos los modelos
+    except ImportError:
+        # Si no hay modelos definidos aún, continuar
+        pass
+    
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
