@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 from app.core.config import settings
-from app.routers import health, auth, patients, admin  # ← Agregar admin aquí
+from app.routers import health, auth, patients, admin  # ← Add admin here
 
-# Importar desde db/sql.py (async)
+# Import from db/sql.py (async)
 from app.db.sql import engine, AsyncSessionLocal
 
 # Define lifespan event
@@ -14,7 +14,7 @@ async def lifespan(app: FastAPI):
     """
     The lifespan function is used to manage the FastAPI application lifecycle.
     """
-    # Inicializar base de datos (crear tablas si no existen)
+    # Initialize database (create tables if they don't exist)
     await init_db()
     yield
 
@@ -27,7 +27,7 @@ app = FastAPI(
 app.include_router(health.router, prefix=settings.API_PREFIX, tags=["health"])
 app.include_router(auth.router, prefix=settings.API_PREFIX, tags=["auth"])
 app.include_router(patients.router, prefix=settings.API_PREFIX, tags=["patients"])
-app.include_router(admin.router, prefix=settings.API_PREFIX, tags=["admin"])  # ← Cambiar esta línea
+app.include_router(admin.router, prefix=settings.API_PREFIX, tags=["admin"])  # ← Change this line
 
 @app.get("/")
 def root():
@@ -43,7 +43,7 @@ async def health_db():
         await session.execute(text("SELECT 1"))
     return {"db": "ok"}
 
-# Función para inicializar la base de datos
+# Function to initialize the database
 async def init_db():
     """
     Initialize database tables
@@ -51,12 +51,12 @@ async def init_db():
     from sqlalchemy.ext.declarative import declarative_base
     Base = declarative_base()
     
-    # Importar todos los modelos aquí para que se registren
-    # Asegúrate de importar todos tus modelos
+    # Import all models here so they get registered
+    # Make sure to import all your models
     try:
-        from app import models  # Esto importa todos los modelos
+        from app import models  # This imports all models
     except ImportError:
-        # Si no hay modelos definidos aún, continuar
+        # If no models are defined yet, continue
         pass
     
     async with engine.begin() as conn:

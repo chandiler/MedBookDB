@@ -15,8 +15,8 @@ async def health_root():
 @router.get("/health/db")
 async def health_db(session: AsyncSession = Depends(get_session)):
     """
-    Valida conectividad a Postgres con un SELECT 1 y expone la server_version.
-    Responde 503 si no hay conectividad (útil para readiness/liveness).
+    Validates PostgreSQL connectivity with SELECT 1 and exposes server_version.
+    Returns 503 if no connectivity (useful for readiness/liveness checks).
     """
     try:
         await session.execute(text("SELECT 1"))
@@ -24,5 +24,5 @@ async def health_db(session: AsyncSession = Depends(get_session)):
         version = result.scalar_one_or_none()
         return {"status": "ok", "database": "postgresql", "server_version": version}
     except SQLAlchemyError as exc:
-        # No exponemos detalles internos
+        # Don't expose internal details
         raise HTTPException(status_code=503, detail="database_unavailable") from exc

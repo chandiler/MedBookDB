@@ -31,8 +31,8 @@ AsyncSessionLocal = async_sessionmaker(
 @asynccontextmanager
 async def session_scope() -> AsyncSession:
     """
-    Context manager para operaciones transaccionales.
-    Maneja commit/rollback y cierre de sesión.
+    Context manager for transactional operations.
+    Handles commit/rollback and session closure.
     """
     async with AsyncSessionLocal() as session:
         try:
@@ -63,11 +63,11 @@ async def init_db():
     from sqlalchemy.ext.declarative import declarative_base
     Base = declarative_base()
     
-    # Importar todos los modelos aquí para que se registren
+    # Import all models here so they get registered
     try:
-        from app import models  # Esto importa todos los modelos
+        from app import models  # This imports all models
     except ImportError:
-        # Si no hay modelos definidos aún, continuar
+        # If no models are defined yet, continue
         pass
     
     async with engine.begin() as conn:

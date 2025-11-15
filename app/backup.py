@@ -1,4 +1,4 @@
-# app/backup.py (modificado)
+# app/backup.py (modified)
 import argparse
 import datetime as dt
 import gzip
@@ -8,13 +8,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-# CAMBIO: Importar la configuración centralizada
+# CHANGE: Import centralized configuration
 try:
     from app.core.config import settings
     HAS_APP_CONFIG = True
 except ImportError:
     HAS_APP_CONFIG = False
-    # Fallback a variables de entorno
+    # Fallback to environment variables
     try:
         from dotenv import load_dotenv
         load_dotenv()
@@ -22,11 +22,11 @@ except ImportError:
         pass
 
 def env_get(key: str, default: str | None = None) -> str:
-    # Si tenemos configuración de la app, úsala primero
+    # If we have app configuration, use it first
     if HAS_APP_CONFIG:
         if hasattr(settings, key):
             return getattr(settings, key)
-        # Mapeo de nombres alternativos
+        # Alternative name mapping
         mapping = {
             'DB_NAME': 'DATABASE_NAME',
             'DB_USER': 'DATABASE_USER', 
@@ -37,10 +37,10 @@ def env_get(key: str, default: str | None = None) -> str:
         if key in mapping and hasattr(settings, mapping[key]):
             return getattr(settings, mapping[key])
     
-    # Fallback a variables de entorno
+    # Fallback to environment variables
     val = os.getenv(key, default)
     if val is None or val == "":
         raise SystemExit(f"[backup] Missing required environment variable: {key}")
     return val
 
-# ... resto del código igual
+# ... rest of the code unchanged
