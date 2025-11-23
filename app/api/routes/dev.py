@@ -4,7 +4,7 @@ from sqlalchemy import update, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.sql import get_session
-from app.modules.users.models import User as UserModel   # ✅ 正确路径
+from app.modules.users.models import User as UserModel   
 from app.core.config import settings
 
 router = APIRouter(prefix="/_dev", tags=["dev"])

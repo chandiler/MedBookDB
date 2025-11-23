@@ -1,10 +1,12 @@
 # app/main.py
 from fastapi import FastAPI
 from app.core.config import settings
-from app.routers import health, auth
+from app.routers import health, auth,patients
 from app.api.routes import admin,doctor
 from app.api.routes import dev
 from app.api.routes import users
+
+
 
 # import middleware and regex
 import re
@@ -48,6 +50,7 @@ app.include_router(admin.router, prefix=settings.API_PREFIX, tags=["admin"])
 app.include_router(doctor.router, prefix=settings.API_PREFIX, tags=["doctor"])
 app.include_router(dev.router, prefix=settings.API_PREFIX, tags=["dev"])
 app.include_router(users.router, prefix=settings.API_PREFIX, tags=["users"])
+app.include_router(patients.router, prefix=settings.API_PREFIX, tags=["patients"])
 
 @app.get("/")
 def root():

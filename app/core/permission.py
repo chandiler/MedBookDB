@@ -1,4 +1,5 @@
 # app/core/permission.py
+
 from __future__ import annotations
 from uuid import UUID
 from typing import Callable, Awaitable
