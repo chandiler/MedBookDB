@@ -12,7 +12,7 @@ from app.modules.users.schemas import PatientUpdateRequest, RegisterRequest, Use
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.config import settings
 
-from app.modules.users.repository import get_patient_by_id_repo, list_patients_repo, update_patient_repo
+from app.modules.users.repository import delete_patient_repo, get_patient_by_id_repo, list_patients_repo, update_patient_repo
 
 # Service-level errors (map them to HTTP in the router)
 class EmailAlreadyExists(Exception):
@@ -172,3 +172,15 @@ async def update_patient(
     if not user:
         raise PatientNotFound("patient_not_found")
     return _to_patient_item(user)
+
+async def delete_patient(
+    session: AsyncSession,
+    patient_id: UUID,
+) -> None:
+    """
+    Delete a patient by id. Raises PatientNotFound if the patient does not exist
+    or is not a patient (role != 'patient').
+    """
+    deleted = await delete_patient_repo(session, patient_id=patient_id)
+    if not deleted:
+        raise PatientNotFound("patient_not_found")

@@ -7,15 +7,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.sql import get_session
 from app.dependencies import get_current_user  
 from app.modules.users.schemas import PatientListItem, PatientListParams, PatientPage, PatientUpdateRequest
-from app.modules.users.service import list_patients
 from app.modules.users.models import User  
 
 from uuid import UUID
 from fastapi import HTTPException, status
 
-from app.modules.users.service import get_patient_by_id as get_patient_by_id_svc, PatientNotFound
 from app.modules.users.schemas import PatientListItem
-from app.modules.users.service import update_patient as update_patient_svc, PatientNotFound
+from app.modules.users.service import (
+    list_patients,
+    get_patient_by_id as get_patient_by_id_svc,
+    update_patient as update_patient_svc,
+    delete_patient as delete_patient_svc,
+    PatientNotFound,
+)
 router = APIRouter(tags=["patients"])
 
 @router.get(
@@ -76,3 +80,28 @@ async def patients_update(
         return await update_patient_svc(session, patient_id, payload)
     except PatientNotFound:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="patient_not_found")
+
+@router.delete(
+    "/patients/{patient_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a patient by id (Bearer required, no role checks)",
+)
+async def patients_delete(
+    patient_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),  # Bearer only
+):
+    """
+    Delete a patient by id.
+
+    Notes:
+    - Requires a valid Bearer token (no specific role checks here).
+    - Returns 204 on success, 404 if the patient does not exist.
+    """
+    try:
+        await delete_patient_svc(session, patient_id)
+    except PatientNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="patient_not_found",
+        )

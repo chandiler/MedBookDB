@@ -196,3 +196,23 @@ async def update_patient_repo(
     await session.flush()
     await session.refresh(user)
     return user
+
+async def delete_patient_repo(
+    session: AsyncSession,
+    *,
+    patient_id: UUID,
+) -> bool:
+    """
+    Delete a patient (role='patient') by id.
+    Returns True if a patient was deleted, False if not found.
+    """
+    stmt = select(User).where(User.id == patient_id, User.role == "patient")
+    result = await session.execute(stmt)
+    user: Optional[User] = result.scalar_one_or_none()
+    if not user:
+        return False
+
+    await session.delete(user)
+    # Flush to apply the DELETE within the current transaction
+    await session.flush()
+    return True
