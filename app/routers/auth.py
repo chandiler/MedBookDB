@@ -2,17 +2,26 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import InvalidTokenError, create_access_token, decode_token, is_refresh_token
 from app.db.sql import get_session
 from app.dependencies import get_current_user
 from app.modules.users.models import User
-from app.modules.users.schemas import LoginRequest, LoginResponse, MeResponse, RefreshRequest, RegisterRequest, RegisterResponse
+from app.modules.users.schemas import (
+    LoginRequest,
+    LoginResponse,
+    MeResponse,
+    RefreshRequest,
+    RegisterRequest,
+    RegisterResponse,
+)
 from app.modules.users.service import InvalidCredentials, login_user, register_user, EmailAlreadyExists
 from app.core.config import settings
 
 router = APIRouter(tags=["auth"])
+
 
 @router.post(
     "/auth/register",
@@ -39,24 +48,23 @@ async def auth_register(
     try:
         user_public = await register_user(session, payload)
     except EmailAlreadyExists:
-        # Keep the message stable; clients can branch on status code.
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="email_already_exists",
         )
     except ValueError as e:
-        # Any unexpected validation error from downstream layers
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e) or "invalid_request",
         )
     return user_public
 
+
 @router.post(
     "/auth/login",
     response_model=LoginResponse,
     status_code=status.HTTP_200_OK,
-    summary="Obtain a Bearer token with email and password",
+    summary="Obtain a Bearer token with email and password (JSON body)",
     responses={
         200: {"description": "Authenticated"},
         401: {"description": "Invalid credentials"},
@@ -66,10 +74,57 @@ async def auth_login(
     payload: LoginRequest,
     session: AsyncSession = Depends(get_session),
 ):
+    """
+    JSON-based login endpoint used by frontend clients.
+
+    Expects:
+    {
+        "email": "user@example.com",
+        "password": "secret"
+    }
+    """
     try:
         return await login_user(session, payload)
     except InvalidCredentials:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid_credentials",
+        )
+
+
+@router.post(
+    "/auth/token",
+    response_model=LoginResponse,
+    status_code=status.HTTP_200_OK,
+    summary="OAuth2 password flow login (for Swagger UI)",
+    responses={
+        200: {"description": "Authenticated"},
+        401: {"description": "Invalid credentials"},
+    },
+)
+async def auth_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    OAuth2 password-flow compatible login endpoint.
+
+    Swagger will send form data:
+    - username: user email
+    - password: user password
+    """
+    login_payload = LoginRequest(
+        email=form_data.username,
+        password=form_data.password,
+    )
+
+    try:
+        return await login_user(session, login_payload)
+    except InvalidCredentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid_credentials",
+        )
 
 
 @router.get(
@@ -84,7 +139,6 @@ async def auth_me(current_user: User = Depends(get_current_user)):
     return _to_public(current_user)
 
 
-# === Optional: refresh flow (only if you want refresh tokens) ===
 @router.post(
     "/auth/refresh",
     response_model=LoginResponse,
@@ -96,10 +150,16 @@ async def auth_refresh(request: RefreshRequest):
     try:
         payload = decode_token(request.refresh_token)
     except InvalidTokenError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid_token",
+        )
 
     if not is_refresh_token(payload):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token_type")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="invalid_token_type",
+        )
 
     user_id = payload.get("sub")
     new_access = create_access_token(subject=str(user_id))
