@@ -2,7 +2,7 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Sequence, Optional
-
+from uuid import UUID
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,10 +14,10 @@ def _utcnow():
 
 
 async def create_availability(
-    db: AsyncSession, *, doctor_id: str, start_time: datetime, end_time: datetime
+    db: AsyncSession, *, doctor_id: UUID, start_time: datetime, end_time: datetime
 ) -> Availability:
     slot = Availability(
-        doctor_id=doctor_id,
+        doctor_id=doctor_id,  # Now accepts UUID directly
         start_time=start_time,
         end_time=end_time,
         is_booked=False,
@@ -39,6 +39,7 @@ async def list_by_doctor(
 
 
 async def get_owner_id_by_slot(db: AsyncSession, *, slot_id: int) -> Optional[str]:
+    print("Repository: Getting owner_id for slot_id:", slot_id)
     row = await db.execute(
         select(Availability.doctor_id).where(Availability.id == slot_id)
     )
@@ -76,3 +77,10 @@ async def update_availability(
 async def delete_availability(db: AsyncSession, *, slot_id: int) -> int:
     res = await db.execute(delete(Availability).where(Availability.id == slot_id))
     return res.rowcount or 0 # type: ignore
+
+async def get_availability_by_id(db: AsyncSession, *, slot_id: int) -> Optional[Availability]:
+    row = await db.execute(
+        select(Availability).where(Availability.id == slot_id)
+    )
+    return row.scalar_one_or_none()
+    

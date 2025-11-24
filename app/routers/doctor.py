@@ -13,10 +13,10 @@ from app.modules.doctors.schemas import (
     AvailabilityPublic,
 )
 from app.modules.doctors import repository as repo
+from app.modules.users.models import User
 
-router = APIRouter(prefix="/availability", tags=["doctor"])
+router = APIRouter(prefix="/availability", tags=["doctor-availability"])
 
-# 6.1: 只有医生可以创建自己的时段
 @router.post(
     "/create",
     response_model=AvailabilityPublic,
@@ -25,13 +25,15 @@ router = APIRouter(prefix="/availability", tags=["doctor"])
 async def create_slot(
     payload: AvailabilityCreate,
     db: AsyncSession = Depends(get_session),
-    user=Depends(require_roles("doctor")),
+    user: User = Depends(require_roles("doctor")),  # <-- explicitly a User
 ):
-    doctor_id = user["sub"]  # JWT 里保存的用户 id
-    # 如果你的 repository 用的是别的函数名，请改成相应的
-    rec = await repo.create_availability(db, doctor_id=doctor_id, data=payload)
+    # Now user is a User ORM instance, not a dict
+    doctor_id = user.id
+    print("Creating availability for doctor_id:", doctor_id)
+    print("Creating availability with start_time:", payload.start_time)
+    print("Creating availability with end_time:", payload.end_time)
+    rec = await repo.create_availability(db, doctor_id=doctor_id,start_time=payload.start_time, end_time=payload.end_time)
     return rec
-
 
 # 6.2: 查看某医生的全部可用时段（对任何已登录用户或公开接口均可）
 @router.get(
@@ -42,7 +44,7 @@ async def list_doctor_slots(
     doctor_id: UUID,
     db: AsyncSession = Depends(get_session),
 ):
-    items = await repo.list_doctor_availability(db, doctor_id=doctor_id)
+    items = await repo.list_by_doctor(db, doctor_id=doctor_id)
     return items
 
 
@@ -51,7 +53,8 @@ async def _get_owner_id(resource_id: int, db: AsyncSession) -> str | None:
     """
     返回该 availability 记录的拥有者(doctor)的 UUID 字符串；不存在返回 None
     """
-    owner = await repo.get_availability_owner(db, availability_id=resource_id)
+    print("Getting owner for availability id:", resource_id)
+    owner = await repo.get_owner_id_by_slot(db, slot_id=resource_id)
     return str(owner) if owner else None
 
 
@@ -64,12 +67,16 @@ async def update_slot(
     resource_id: int = Path(..., ge=1),
     payload: AvailabilityUpdate = None,
     db: AsyncSession = Depends(get_session),
-    user=Depends(require_owner_or_admin(_get_owner_id)),
+    response_model=AvailabilityPublic,
+   # user=Depends(require_owner_or_admin(_get_owner_id)),
 ):
-    rec = await repo.update_availability(db, availability_id=resource_id, data=payload)
+    print("Updating availability id:", resource_id)
+    print("Update payload:", payload.start_time, payload.end_time, payload.is_booked)
+    rec = await repo.update_availability(db, slot_id=resource_id, start_time=payload.start_time, end_time=payload.end_time, is_booked=payload.is_booked)
     if rec is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
-    return rec
+    availability = await repo.get_availability_by_id(db, slot_id=resource_id)
+    return availability
 
 
 # 6.4: 删除时段（医生本人或管理员）
@@ -82,7 +89,7 @@ async def delete_slot(
     db: AsyncSession = Depends(get_session),
     user=Depends(require_owner_or_admin(_get_owner_id)),
 ):
-    ok = await repo.delete_availability(db, availability_id=resource_id)
+    ok = await repo.delete_availability(db, slot_id=resource_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
     return None

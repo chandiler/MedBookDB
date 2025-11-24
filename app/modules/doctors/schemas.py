@@ -2,6 +2,7 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 class AvailabilityCreate(BaseModel):
@@ -33,7 +34,7 @@ class AvailabilityUpdate(BaseModel):
 
 class AvailabilityPublic(BaseModel):
     id: int
-    doctor_id: str
+    doctor_id: UUID
     start_time: datetime
     end_time: datetime
     is_booked: bool

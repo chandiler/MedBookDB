@@ -29,7 +29,7 @@ app.include_router(auth.router, prefix=settings.API_PREFIX, tags=["auth"])
 app.include_router(patients.router, prefix=settings.API_PREFIX, tags=["patients"])
 app.include_router(admin.router, prefix=settings.API_PREFIX, tags=["admin"]) 
 app.include_router(appointments.router, prefix=settings.API_PREFIX, tags=["appointments"])
-app.include_router(doctor.router, prefix=settings.API_PREFIX, tags=["doctor"])
+app.include_router(doctor.router, prefix=settings.API_PREFIX)
 
 @app.get("/")
 def root():
