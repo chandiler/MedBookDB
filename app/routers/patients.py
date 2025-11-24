@@ -25,7 +25,7 @@ router = APIRouter(tags=["patients"])
 @router.get(
     "/patients",
     response_model=PatientPage,
-    summary="List patients (Bearer required, no role checks)"
+    summary="List patients (Bearer required, no role checks)",
 )
 async def patients_index(
     q: str | None = Query(None, description="Search on email/first_name/last_name"),

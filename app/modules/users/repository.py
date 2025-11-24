@@ -216,3 +216,61 @@ async def delete_patient_repo(
     # Flush to apply the DELETE within the current transaction
     await session.flush()
     return True
+
+async def list_doctors_repo(
+    session: AsyncSession,
+    *,
+    q: Optional[str],
+    is_active: Optional[bool],
+    email_verified: Optional[bool],
+    order_by: str,
+    order_dir: str,
+    limit: int,
+    offset: int,
+) -> tuple[list[User], int]:
+    """
+    List doctors (role='doctor') with search, flags, ordering, and pagination.
+    """
+    # Base WHERE: only doctors
+    conditions = [User.role == "doctor"]
+
+    # Flags
+    if is_active is not None:
+        conditions.append(User.is_active == is_active)
+    if email_verified is not None:
+        conditions.append(User.email_verified == email_verified)
+
+    # Search (ILIKE on email/first/last names)
+    if q:
+        term = f"%{q.strip().lower()}%"
+        conditions.append(
+            or_(
+                func.lower(User.email).ilike(term),
+                func.lower(User.first_name).ilike(term),
+                func.lower(User.last_name).ilike(term),
+            )
+        )
+
+    # Order
+    col_map = {
+        "created_at": User.created_at,
+        "last_name": User.last_name,
+        "email": User.email,
+    }
+    col = col_map.get(order_by, User.created_at)
+    ordering = asc(col) if order_dir == "asc" else desc(col)
+
+    # Total count
+    total_stmt = select(func.count()).select_from(User).where(*conditions)
+    total = (await session.execute(total_stmt)).scalar_one()
+
+    # Page
+    stmt = (
+        select(User)
+        .where(*conditions)
+        .order_by(ordering, User.id)  # tie-breaker for stable paging
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+    return rows, total

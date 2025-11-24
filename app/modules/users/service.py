@@ -12,7 +12,7 @@ from app.modules.users.schemas import PatientUpdateRequest, RegisterRequest, Use
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.config import settings
 
-from app.modules.users.repository import delete_patient_repo, get_patient_by_id_repo, list_patients_repo, update_patient_repo
+from app.modules.users.repository import delete_patient_repo, get_patient_by_id_repo, list_doctors_repo, list_patients_repo, update_patient_repo
 
 # Service-level errors (map them to HTTP in the router)
 class EmailAlreadyExists(Exception):
@@ -184,3 +184,32 @@ async def delete_patient(
     deleted = await delete_patient_repo(session, patient_id=patient_id)
     if not deleted:
         raise PatientNotFound("patient_not_found")
+    
+async def list_doctors(
+    session: AsyncSession,
+    params: PatientListParams,
+) -> PatientPage:
+    """
+    List doctors (role='doctor') with search, flags, ordering, and pagination.
+    Reuses PatientListParams / PatientPage DTOs for simplicity.
+    """
+    users, total = await list_doctors_repo(
+        session,
+        q=params.q,
+        is_active=params.is_active,
+        email_verified=params.email_verified,
+        order_by=params.order_by,
+        order_dir=params.order_dir,
+        limit=params.limit,
+        offset=params.offset,
+    )
+    items = [_to_patient_item(u) for u in users]
+    has_next = params.offset + params.limit < total
+    return PatientPage(
+        items=items,
+        total=total,
+        limit=params.limit,
+        offset=params.offset,
+        has_next=has_next,
+    )
+
