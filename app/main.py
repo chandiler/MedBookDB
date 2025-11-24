@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 from app.core.config import settings
-from app.routers import health, auth, patients, admin, appointments  # ← Add admin here
+from app.routers import health, auth, patients, admin, appointments, doctor
 
 # Import from db/sql.py (async)
 from app.db.sql import engine, AsyncSessionLocal
@@ -27,8 +27,9 @@ app = FastAPI(
 app.include_router(health.router, prefix=settings.API_PREFIX, tags=["health"])
 app.include_router(auth.router, prefix=settings.API_PREFIX, tags=["auth"])
 app.include_router(patients.router, prefix=settings.API_PREFIX, tags=["patients"])
-app.include_router(admin.router, prefix=settings.API_PREFIX, tags=["admin"])  # ← Change this line
+app.include_router(admin.router, prefix=settings.API_PREFIX, tags=["admin"]) 
 app.include_router(appointments.router, prefix=settings.API_PREFIX, tags=["appointments"])
+app.include_router(doctor.router, prefix=settings.API_PREFIX, tags=["doctor"])
 
 @app.get("/")
 def root():

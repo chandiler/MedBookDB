@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.sql import get_session
 from app.dependencies import get_current_user
 from app.modules.users.models import User
-from app.core.permissions import require_roles
+from app.core.permission import require_roles
 
 from app.modules.appointments.schemas import (
     AppointmentCreateRequest,
@@ -111,7 +111,7 @@ async def appointments_for_doctor(
     # If doctor, show their own schedule.
     if current_user.role == "doctor" and current_user.id != doctor_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.xf,
             detail="cannot_view_other_doctor_schedule",
         )
 
