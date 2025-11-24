@@ -172,6 +172,7 @@ async def get_patient_by_id_repo(
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
+
 async def update_patient_repo(
     session: AsyncSession,
     *,
@@ -188,6 +189,9 @@ async def update_patient_repo(
     user: Optional[User] = result.scalar_one_or_none()
     if not user:
         return None
+    
+    if user.role != "patient":
+        return None
 
     user.first_name = first_name.strip()
     user.last_name = last_name.strip()
@@ -196,6 +200,7 @@ async def update_patient_repo(
     await session.flush()
     await session.refresh(user)
     return user
+
 
 async def delete_patient_repo(
     session: AsyncSession,
@@ -274,3 +279,32 @@ async def list_doctors_repo(
     )
     rows = (await session.execute(stmt)).scalars().all()
     return rows, total
+
+async def update_doctor_repo(
+    session: AsyncSession,
+    *,
+    doctor_id: UUID,
+    first_name: str,
+    last_name: str,
+    phone: Optional[str],
+) -> Optional[User]:
+    """
+    Update a doctor (role='doctor') by id. Returns updated user or None if not found.
+    """
+    stmt = select(User).where(User.id == doctor_id, User.role == "doctor")
+    result = await session.execute(stmt)
+    user: Optional[User] = result.scalar_one_or_none()
+    if not user:
+        return None
+
+    if user.role != "doctor":
+        return None
+    
+    user.first_name = first_name.strip()
+    user.last_name = last_name.strip()
+    user.phone = phone.strip() if isinstance(phone, str) else None
+
+    await session.flush()
+    await session.refresh(user)
+    return user
+

@@ -3,14 +3,15 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query,status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permission import require_roles
 from app.db.sql import get_session
 from app.dependencies import get_current_user
 from app.modules.users.models import User
-from app.modules.users.schemas import PatientListParams, PatientPage
-from app.modules.users.service import list_doctors
+from app.modules.users.schemas import PatientListItem, PatientListParams, PatientPage, PatientUpdateRequest
+from app.modules.users.service import DoctorNotFound, list_doctors, update_doctor
 
 router = APIRouter(tags=["doctors"])
 
@@ -41,3 +42,29 @@ async def doctors_index(
         order_dir=order_dir,
     )
     return await list_doctors(session, params)
+
+@router.put(
+    "/doctors/{doctor_id}",
+    response_model=PatientListItem,
+    summary="Update a doctor by id (doctor/admin only)",
+)
+async def doctors_update(
+    doctor_id: UUID,
+    payload: PatientUpdateRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_roles("doctor", "admin")),
+):
+    """
+    Update a doctor (first_name, last_name, phone) by id.
+
+    Notes:
+    - Requires a valid Bearer token with role 'doctor' or 'admin'.
+    - Returns 404 if the doctor does not exist or is not role='doctor'.
+    """
+    try:
+        return await update_doctor(session, doctor_id, payload)
+    except DoctorNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="doctor_not_found",
+        )

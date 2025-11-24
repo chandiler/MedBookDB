@@ -12,7 +12,7 @@ from app.modules.users.schemas import PatientUpdateRequest, RegisterRequest, Use
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
 from app.core.config import settings
 
-from app.modules.users.repository import delete_patient_repo, get_patient_by_id_repo, list_doctors_repo, list_patients_repo, update_patient_repo
+from app.modules.users.repository import delete_patient_repo, get_patient_by_id_repo, list_doctors_repo, list_patients_repo, update_doctor_repo, update_patient_repo
 
 # Service-level errors (map them to HTTP in the router)
 class EmailAlreadyExists(Exception):
@@ -146,6 +146,14 @@ async def list_patients(
 class PatientNotFound(Exception):
     pass
 
+class PatientNotFound(Exception):
+    pass
+
+
+class DoctorNotFound(Exception):
+    pass
+
+
 def _to_patient_item(u: User) -> PatientListItem:
     return PatientListItem.model_validate(u)
 
@@ -213,3 +221,21 @@ async def list_doctors(
         has_next=has_next,
     )
 
+async def update_doctor(
+    session: AsyncSession,
+    doctor_id: UUID,
+    payload: PatientUpdateRequest,
+) -> PatientListItem:
+    """
+    Update a doctor by id. Raises DoctorNotFound if no doctor is found.
+    """
+    user = await update_doctor_repo(
+        session,
+        doctor_id=doctor_id,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        phone=payload.phone,
+    )
+    if not user:
+        raise DoctorNotFound("doctor_not_found")
+    return _to_patient_item(user)
