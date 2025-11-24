@@ -12,6 +12,7 @@ Env / .env variables:
   BACKUP_DIR (default: ./backups)
 """
 
+# app/restore.py
 import argparse
 import gzip
 import os
@@ -19,133 +20,145 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from datetime import datetime
+from urllib.parse import urlparse
 
-# LOAD ENVIRONMENT VARIABLE (.env) — OPTIONAL
 try:
-    from dotenv import load_dotenv  # type: ignore
-    load_dotenv() # automatically read .env file and add to os.environ
-except Exception:
-    # if dotenv is not available or error 
-    # -> skip (still use existing environment variables)
-    pass
+    from app.core.config import settings
+    HAS_APP_CONFIG = True
+except ImportError:
+    HAS_APP_CONFIG = False
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception:
+        pass
 
-# FUNCTION TO GET ENVIRONMENT VARIABLES
-def env_get(key: str, default: str | None = None) -> str:
-    """
-        Get the value of environment variable (key).
-        If none or empty -> stop the program with an error message.
-    """
-    val = os.getenv(key, default)
-    if val is None or val == "":
-        raise SystemExit(f"[restore] Missing required environment variable: {key}")
-    return val
 
-# GET THE LATEST BACKUP FILE IN THE FOLDER
-def latest_backup(backup_dir: Path) -> Path | None:
+def get_db_conn_params() -> tuple[str, str, str, str, str]:
     """
-        Find the latest *.sql.gz file (sorted by name descending).
-        Requires filenames containing lexicographically increasing timestamps (YYYYmmddHHMMSS).
+    Extract DB name, user, password, host, port
+    — SQL_DSN priority of Settings
+    — if not present then fallback to env DB_NAME / DB_USER / ... 
     """
-    cand = sorted(backup_dir.glob("*.sql.gz"), key=lambda p: p.name, reverse=True)
+    dsn = ""
+    if HAS_APP_CONFIG:
+        dsn = getattr(settings, "SQL_DSN", "") or ""
+    if not dsn:
+        dsn = os.getenv("SQL_DSN", "")
+
+    if dsn:
+        parsed = urlparse(dsn)
+        dbname = (parsed.path or "").lstrip("/")
+        user = parsed.username
+        password = parsed.password
+        host = parsed.hostname or "localhost"
+        port = str(parsed.port or 5432)
+
+        if not (user and password and dbname):
+            raise SystemExit("[restore] SQL_DSN must include user, password and db name")
+        return dbname, user, password, host, port
+
+    dbname = os.getenv("DB_NAME")
+    user = os.getenv("DB_USER")
+    password = os.getenv("DB_PASSWORD")
+    host = os.getenv("DB_HOST", "localhost")
+    port = os.getenv("DB_PORT", "5432")
+
+    if not (dbname and user and password):
+        raise SystemExit("[restore] Missing DB env variables")
+
+    return dbname, user, password, host, port
+
+
+def latest_backup(dir: Path) -> Path | None:
+    cand = sorted(dir.glob("*.sql.gz"), key=lambda p: p.name, reverse=True)
     return cand[0] if cand else None
 
 
-# DATA RECOVERY
 def main() -> int:
-    # Read command line arguments
     parser = argparse.ArgumentParser(description="PostgreSQL restore tool")
     parser.add_argument("--file", type=str, help="backup file (.sql.gz) to restore from")
-    parser.add_argument("--drop-schema", action="store_true", help="drop schema public CASCADE before restore")
-    parser.add_argument("--yes", action="store_true", help="auto-confirm without prompt")
+    parser.add_argument("--drop-schema", action="store_true", help="DROP SCHEMA public CASCADE before restore")
+    parser.add_argument("--yes", action="store_true", help="Automatically confirm without prompt")
     args = parser.parse_args()
 
-    # Get DB connection information from environment variable
-    dbname = env_get("DB_NAME")
-    dbuser = env_get("DB_USER")
-    dbpass = env_get("DB_PASSWORD")
-    dbhost = env_get("DB_HOST", "localhost")
-    dbport = env_get("DB_PORT", "5432")
-    backup_dir = Path(os.getenv("BACKUP_DIR", "./backups")).resolve()
-    backup_dir.mkdir(parents=True, exist_ok=True) # make sure the directory exists
+    dbname, dbuser, dbpass, dbhost, dbport = get_db_conn_params()
 
-    # Specify the source file to restore
+    backup_dir = Path(os.getenv("BACKUP_DIR", "./backups")).resolve()
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    # Determine backup file
     if args.file:
-        # If user specifies a specific file via --file
         src = Path(args.file).resolve()
     else:
-        # Otherwise, manually select the latest version in BACKUP_DIR
         src = latest_backup(backup_dir)
         if not src:
-            raise SystemExit(f"[restore] No backup files found in {backup_dir}")
+            raise SystemExit(f"[restore] No backups found in: {backup_dir}")
 
-    #Check existence & format *.sql.gz
-    if not src.exists() or not src.suffixes[-2:] == ['.sql', '.gz']:
-        raise SystemExit(f"[restore] File not found or not .sql.gz: {src}")
+    if not src.exists() or not src.suffixes[-2:] == [".sql", ".gz"]:
+        raise SystemExit(f"[restore] File invalid or not .sql.gz: {src}")
 
     print(f"[restore] Restoring from: {src}")
 
-    # Confirm dangerous operation (if no --yes)
     if not args.yes:
-        ans = input("This will modify database. Proceed? [y/N]: ").strip().lower()
-        if ans != 'y':
+        ans = input("WARNING: This will alter database. Continue? [y/N]: ").strip().lower()
+        if ans != "y":
             print("[restore] Aborted.")
             return 0
 
-    # Check if 'psql' is in PATH
     psql = shutil.which("psql")
     if not psql:
-        raise SystemExit("[restore] 'psql' not found in PATH. Install PostgreSQL client tools.")
+        raise SystemExit("[restore] 'psql' not found in PATH.")
 
-    # Prepare ENV to pass to psql (set PGPASSWORD)
     env = os.environ.copy()
     env["PGPASSWORD"] = dbpass
 
-    # (Optional) Clear the schema before restoring
     if args.drop_schema:
-        print("[restore] Dropping schema public CASCADE...")
-        # -v ON_ERROR_STOP=1: stop immediately if an error occurs
-        drop_cmd = [psql, "-h", dbhost, "-p", str(dbport), "-U", dbuser, "-d", dbname, "-v", "ON_ERROR_STOP=1"]
-
-        # Send SQL statements directly to stdin:
-        # DROP SCHEMA ... CASCADE; -> delete all objects in the public schema
-        # CREATE SCHEMA public; -> recreate the empty schema
+        print("[restore] Dropping schema public...")
+        drop_cmd = [
+            psql,
+            "-h", dbhost,
+            "-p", str(dbport),
+            "-U", dbuser,
+            "-d", dbname,
+            "-v", "ON_ERROR_STOP=1"
+        ]
         proc = subprocess.run(
             drop_cmd,
             input=b"DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;",
             env=env,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
         )
-
-
         if proc.returncode != 0:
-            # Print stderr to show the user errors from PostgreSQL
-            sys.stderr.write(proc.stderr.decode("utf-8", errors="ignore"))
+            sys.stderr.write(proc.stderr.decode())
             return proc.returncode
 
-    # Unpack & load dump into DB in one transaction
-    print("[restore] Loading SQL into database (single-transaction)...")
+    # RESTORE SQL DUMP
+    restore_cmd = [
+        psql,
+        "-h", dbhost,
+        "-p", str(dbport),
+        "-U", dbuser,
+        "-d", dbname,
+        "-v", "ON_ERROR_STOP=1",
+        "-1",  # single-transaction
+    ]
 
-    # -1: execute in single-transaction mode (commit if successful, rollback if all errors)
-    # -v ON_ERROR_STOP=1: stop any error immediately
-    restore_cmd = [psql, "-h", dbhost, "-p", str(dbport), "-U", dbuser, "-d", dbname, "-v", "ON_ERROR_STOP=1", "-1"]
+    print("[restore] Loading SQL into DB...")
 
-    # Open .sql.gz file and read SQL data (compressed) -> decompress to RAM
     with gzip.open(src, "rb") as f:
         data = f.read()
 
-    # Run psql, pass SQL content to stdin
     proc = subprocess.run(restore_cmd, input=data, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    # If there is an error during restore, print stderr and return the error code
     if proc.returncode != 0:
-        sys.stderr.write(proc.stderr.decode("utf-8", errors="ignore"))
+        sys.stderr.write(proc.stderr.decode())
         return proc.returncode
-    
 
-    print("[restore] Done.")
+    print("[restore] SUCCESS.")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
